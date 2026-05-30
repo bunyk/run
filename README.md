@@ -35,11 +35,7 @@ Go to https://www.polar.com/accesslink-api/ to obtain your client id and secret,
 - `POLAR_CLIENT_ID`
 - `POLAR_CLIENT_SECRET`
 
-You could also store them in `my.env` file and load them with:
-
-```
-export $(cat my.env | xargs)
-```
+You could also store them in `my.env` file.
 
 Then running `python fetch_polar.py` would download TCX files
 for recent 30 days of workouts that you have not yet downloaded.

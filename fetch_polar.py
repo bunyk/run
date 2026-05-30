@@ -20,6 +20,13 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import requests
 
+with open('my.env', 'r') as fh:
+    vars_dict = dict(
+        tuple(line.replace('\n', '').split('='))
+        for line in fh.readlines() if not line.startswith('#')
+    )
+os.environ.update(vars_dict)
+
 CLIENT_ID = os.getenv("POLAR_CLIENT_ID")
 CLIENT_SECRET = os.getenv("POLAR_CLIENT_SECRET")
 MEMBER_ID = os.getenv("POLAR_MEMBER_ID", "my_user_123")
@@ -112,8 +119,6 @@ def main():
         if hasattr(e, 'response') and e.response.status_code == 403:
             print("Hint: User may not have accepted all mandatory consents at https://account.polar.com")
 
-# TODO: Download new ones
-
 def download_exercise(exercise):
     """Download exercise data in TCX format"""
     start_time = exercise.get('start_time', '')
@@ -124,7 +129,7 @@ def download_exercise(exercise):
     else:
         date_str = exercise.get('id', 'unknown')
     sp = exercise.get('sport', 'unknown').lower()
-    filename = f"data/{sp}_{date_str}.tcx"
+    filename = f"data/{date_str}_{sp}.tcx"
     if os.path.exists(filename):
         print(f"Exercise {exercise.get('id', '?')} already exists as {filename}, skipping download")
         return
@@ -135,7 +140,7 @@ def download_exercise(exercise):
     response.raise_for_status()
     with open(filename, 'wb') as f:
         f.write(response.content)
-    print(f"Run {exercise.get('id', '?')} downloaded as {filename}")
+    print(f"Downloaded as {filename}")
 
 class CallbackHandler(BaseHTTPRequestHandler):
     def do_GET(self):
