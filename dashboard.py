@@ -45,22 +45,12 @@ def main():
 
     # Best times summaries
     st.subheader("🏆 Best Times")
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        best_100 = df[df['best_100'].notna()]['best_100'].min()
-        st.metric("100m", format_duration(best_100) if pd.notna(best_100) else "N/A")
-    with col2:
-        best_1k = df[df['best_1k'].notna()]['best_1k'].min()
-        st.metric("1km", format_duration(best_1k) if pd.notna(best_1k) else "N/A")
-    with col3:
-        best_3200 = df[df['best_3200'].notna()]['best_3200'].min()
-        st.metric("3200m", format_duration(best_3200) if pd.notna(best_3200) else "N/A")
-    with col4:
-        best_5k = df[df['best_5k'].notna()]['best_5k'].min()
-        st.metric("5km", format_duration(best_5k) if pd.notna(best_5k) else "N/A")
-    with col5:
-        best_10k = df[df['best_10k'].notna()]['best_10k'].min()
-        st.metric("10km", format_duration(best_10k) if pd.notna(best_10k) else "N/A")
+    best_times = []
+    for name, col in [("100m", "best_100"), ("1km", "best_1k"), ("3200m", "best_3200"), ("5km", "best_5k"), ("10km", "best_10k")]:
+        val = df[df[col].notna()][col].min()
+        best_times.append((name, format_duration(val) if pd.notna(val) else "N/A"))
+    
+    st.markdown("| Record | Time |\n|--------|------|\n" + "\n".join(f"| {name} | {time} |" for name, time in best_times))
 
     # --- Charts ---
     st.header("📊 Trends")
@@ -85,7 +75,7 @@ def main():
             st.bar_chart(chart_data.set_index('period')['display_value'], use_container_width=True)
         else:
             # For best times, convert to minutes for better readability
-            chart_data['display_value'] = chart_data['value'] / 60
+            chart_data['display_value'] = chart_data['value']
             st.bar_chart(chart_data.set_index('period')['display_value'], use_container_width=True)
     else:
         st.info(f"No data available for {selected_metric} with {aggregation} aggregation")
