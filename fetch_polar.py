@@ -15,6 +15,7 @@ import base64
 import os
 import sys
 import webbrowser
+from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import requests
@@ -30,6 +31,9 @@ API_BASE = "https://www.polaraccesslink.com/v3"
 
 auth_code = None
 server = None
+
+session = requests.Session()
+session.headers.update({'Accept': 'application/json'})
 
 def main():
     global server
@@ -74,36 +78,64 @@ def main():
         print(f"Error getting access token: {e}")
         sys.exit(1)
 
+    session.headers.update({'Authorization': f'Bearer {access_token}'})
+
     # Step 5: Register user
-    if not register_user(access_token):
+    if not register_user():
         print("Failed to register user")
         sys.exit(1)
 
     # Step 6: List exercises
     try:
-        exercises = list_exercises(access_token)
+        exercises = list_exercises()
         print(f"\n{'='*60}")
         print(f"YOUR EXERCISES ({len(exercises)})")
         print(f"{'='*60}")
 
         if not exercises:
-            print("No exercises found (only last 30 days are returned)")
+            print("No exercises found (only last 30 days are returned, and only ones after user registration).")
 
         for i, exercise in enumerate(exercises, 1):
             print(f"\n{i}. {exercise.get('id', 'N/A')}")
             print(f"   Sport: {exercise.get('sport', 'N/A')}")
-            print(f"   Device: {exercise.get('device', 'N/A')}")
             print(f"   Start: {exercise.get('start_time', 'N/A')}")
             print(f"   Duration: {exercise.get('duration', 'N/A')}")
             print(f"   Distance: {exercise.get('distance', 0)}m")
             print(f"   Calories: {exercise.get('calories', 0)}")
             print(f"   Heart Rate: Avg {exercise.get('heart_rate', {}).get('average', 'N/A')}, Max {exercise.get('heart_rate', {}).get('maximum', 'N/A')}")
 
+            download_exercise(exercise)
+
         print(f"\n{'='*60}")
     except requests.exceptions.HTTPError as e:
         print(f"Error listing exercises: {e}")
         if hasattr(e, 'response') and e.response.status_code == 403:
             print("Hint: User may not have accepted all mandatory consents at https://account.polar.com")
+
+# TODO: Download new ones
+
+def download_exercise(exercise):
+    """Download exercise data in TCX format"""
+    start_time = exercise.get('start_time', '')
+    # Parse ISO 8601 datetime and format as YYYY-MM-DD_HH-MM-SS
+    if start_time:
+        dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+        date_str = dt.strftime('%Y-%m-%d_%H-%M-%S')
+    else:
+        date_str = exercise.get('id', 'unknown')
+    sp = exercise.get('sport', 'unknown').lower()
+    filename = f"data/{sp}_{date_str}.tcx"
+    if os.path.exists(filename):
+        print(f"Exercise {exercise.get('id', '?')} already exists as {filename}, skipping download")
+        return
+    response = session.get(f"{API_BASE}/exercises/{exercise['id']}/tcx", headers={'Accept': 'application/vnd.garmin.tcx+xml'})
+    if response.status_code == 404:
+        print(f"TCX data not available for {exercise.get('id', '?')}, skipping download")
+        return
+    response.raise_for_status()
+    with open(filename, 'wb') as f:
+        f.write(response.content)
+    print(f"Run {exercise.get('id', '?')} downloaded as {filename}")
 
 class CallbackHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -144,39 +176,23 @@ def get_access_token(code):
     return response.json()
 
 
-def register_user(access_token):
+def register_user():
     """Register user to access their data"""
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    }
 
-    payload = {"member-id": MEMBER_ID}
-
-    response = requests.post(
-        f"{API_BASE}/users",
-        headers=headers,
-        json=payload
-    )
+    response = session.post(f"{API_BASE}/users", json={"member-id": MEMBER_ID})
 
     if response.status_code == 200:
         print(f"User registered: {response.json()}")
-    elif response.status_code == 204:
-        print("User already registered or no content")
+    elif response.status_code == 409:
+        print("User already registered")
     else:
         print(f"User registration error: {response.status_code} - {response.text}")
-    return response.status_code in (200, 204)
+    return response.status_code in (200, 409)
 
 
-def list_exercises(access_token):
+def list_exercises():
     """List user's exercises"""
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-        'Accept': 'application/json'
-    }
-
-    response = requests.get(f"{API_BASE}/exercises", headers=headers)
+    response = session.get(f"{API_BASE}/exercises")
     response.raise_for_status()
     exercises = response.json()
     return exercises
