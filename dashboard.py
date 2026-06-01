@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import datetime
+import matplotlib.pyplot as plt
 
 from tcx import TCX
 from db import ActivityDB
@@ -24,7 +25,6 @@ def main():
     # Convert to DataFrame
     df = pd.DataFrame(activities)
 
-    print('dtypes', df.dtypes)
     df['start_time'] = pd.to_datetime(df['start_time'])
     for field in ['duration', 'best_100', 'best_1k', 'best_3200', 'best_5k', 'best_10k']:
         df[field] = pd.to_timedelta(df[field], unit='s')
@@ -67,16 +67,23 @@ def main():
     
     if len(chart_data) > 0:
         # Format the chart based on metric type
-        if selected_metric == 'duration':
-            chart_data['display_value'] = chart_data['value']
-            st.bar_chart(chart_data.set_index('period')['display_value'], use_container_width=True)
-        elif selected_metric == 'distance':
-            chart_data['display_value'] = chart_data['value'] / 1000  # Convert to km
-            st.bar_chart(chart_data.set_index('period')['display_value'], use_container_width=True)
+        fig, ax = plt.subplots()
+        
+        if selected_metric == 'distance':
+            y_values = chart_data['value'] / 1000  # Convert to km
+            y_label = "Distance (km)"
         else:
-            # For best times, convert to minutes for better readability
-            chart_data['display_value'] = chart_data['value']
-            st.bar_chart(chart_data.set_index('period')['display_value'], use_container_width=True)
+            # duration
+            y_values = chart_data['value'].apply(lambda x: x.total_seconds())
+            ax.yaxis.set_major_formatter(durationFormatter)
+            y_label = selected_metric
+        
+        ax.bar(chart_data['period'].astype(str), y_values)
+        ax.set_xlabel('Period')
+        ax.set_ylabel(y_label)
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        st.pyplot(fig)
     else:
         st.info(f"No data available for {selected_metric} with {aggregation} aggregation")
 
@@ -91,20 +98,52 @@ def main():
         'filename': None,
     })
 
+
+def duration_format_func(x, pos, zfill=False):
+    parts = []
+    hours = int(x//3600)
+    minutes = int((x%3600)//60)
+    seconds = int(x%60)
+    if hours > 0 or zfill:
+        parts.append(f"{hours}")
+    if minutes > 0 or hours > 0 or zfill:
+        parts.append(f"{minutes:02d}")
+
+    parts.append(f"{seconds:02d}")
+    return ":".join(parts)
+
+from matplotlib.ticker import FuncFormatter
+durationFormatter = FuncFormatter(duration_format_func)
+
 def aggregate_data(df, aggregation, metric):
     """Aggregate data by time period for a given metric."""
     df = df.copy()
     df['date'] = df['start_time'].dt.date
-    
+
     if aggregation == 'Daily':
         grouped = df.groupby('date')
+        all_periods = pd.date_range(
+            start=df['date'].min(),
+            end=df['date'].max(),
+            freq='D'
+        ).date
     elif aggregation == 'Weekly':
-        df['week'] = df['start_time'].dt.to_period('W').dt.start_time
+        df['week'] = df['start_time'].dt.to_period('W').dt.start_time.dt.date
         grouped = df.groupby('week')
+        all_periods = pd.date_range(
+            start=df['date'].min(),
+            end=df['date'].max(),
+            freq='W'
+        ).date
     else:  # Monthly
-        df['month'] = df['start_time'].dt.to_period('M').dt.start_time
+        df['month'] = df['start_time'].dt.to_period('M').dt.start_time.dt.date
         grouped = df.groupby('month')
-    
+        all_periods = pd.date_range(
+            start=df['date'].min(),
+            end=df['date'].max(),
+            freq='MS'
+        ).date
+
     if metric == 'duration':
         aggregated = grouped['duration'].sum().reset_index()
         aggregated.columns = ['period', 'value']
@@ -117,9 +156,12 @@ def aggregate_data(df, aggregation, metric):
         aggregated.columns = ['period', 'value']
         # Drop rows with NaN values
         aggregated = aggregated.dropna()
-    
-    return aggregated
 
+    # Create complete date series
+    complete = pd.DataFrame({'period': all_periods})
+    result = complete.merge(aggregated, on='period', how='left')
+
+    return result
 
 if __name__ == '__main__':
     main()

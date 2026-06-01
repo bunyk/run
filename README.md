@@ -1,24 +1,32 @@
 # Run
 
-What you can not measure, you cannot improve. I don't think it's 100% true,
-it's just you would not know if it is improving or not.
+> What you can not measure, you cannot improve.
 
-I'm not 100% satisfied with Strava, I was more of an Endomondo fan, but it died,
-therefore, I've built a set of scripts to replace it. 
+I don't think it's 100% true, it's just you would not know if it is improving or not.
+
+I'm not 100% satisfied with Strava, I was more of an Endomondo enjoyer, but it died.
 
 What here is better that Strava:
 
 - Scripts are free, as in beer, and open source, as in freedom.
 - Total privacy, your data is stored on your computer, so you even run on Aircraft carrier.
-- Just important metrics.
+- Just important metrics - your records and training time.
 
 Disadvantage - to compare yourself with friends you would need to
-send them your data with PRs and stuff over email or by other means.
-
+send them your data with PRs and stuff over email or by other means. But maybe it is
+not that bad, as you should compare yourself with yourself and get some break
+from social media.
 
 ## Usage
 
-Your data is stored in tcx files in `data/` folder.
+Your data is stored in tcx files in `data/` folder. Download your TCX files there.
+
+
+### Dashboard 
+
+Run `streamlit run dashboard.py` to generate a dashboard of your workouts, looking something similar to this:
+
+![dashboard](dashboard.png)
 
 
 ### Heatmap
