@@ -118,6 +118,9 @@ durationFormatter = FuncFormatter(duration_format_func)
 def aggregate_data(df, aggregation, metric):
     """Aggregate data by time period for a given metric."""
     df = df.copy()
+    # Ensure start_time is timezone-naive to avoid period conversion warnings
+    if df['start_time'].dt.tz is not None:
+        df['start_time'] = df['start_time'].dt.tz_localize(None)
     df['date'] = df['start_time'].dt.date
 
     if aggregation == 'Daily':
@@ -130,19 +133,19 @@ def aggregate_data(df, aggregation, metric):
     elif aggregation == 'Weekly':
         df['week'] = df['start_time'].dt.to_period('W').dt.start_time.dt.date
         grouped = df.groupby('week')
-        all_periods = pd.date_range(
-            start=df['date'].min(),
-            end=df['date'].max(),
+        all_periods = pd.period_range(
+            start=df['start_time'].min(),
+            end=df['start_time'].max(),
             freq='W'
-        ).date
+        ).start_time.date
     else:  # Monthly
         df['month'] = df['start_time'].dt.to_period('M').dt.start_time.dt.date
         grouped = df.groupby('month')
-        all_periods = pd.date_range(
-            start=df['date'].min(),
-            end=df['date'].max(),
-            freq='MS'
-        ).date
+        all_periods = pd.period_range(
+            start=df['start_time'].min(),
+            end=df['start_time'].max(),
+            freq='M'
+        ).start_time.date
 
     if metric == 'duration':
         aggregated = grouped['duration'].sum().reset_index()

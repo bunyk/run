@@ -119,6 +119,10 @@ def main():
         if hasattr(e, 'response') and e.response.status_code == 403:
             print("Hint: User may not have accepted all mandatory consents at https://account.polar.com")
 
+    print("Refreshing database index...")
+    from db import reindex
+    reindex()
+
 def download_exercise(exercise):
     """Download exercise data in TCX format"""
     start_time = exercise.get('start_time', '')

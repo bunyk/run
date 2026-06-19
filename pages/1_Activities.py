@@ -15,6 +15,7 @@ def main():
         st.warning("No TCX files found in the data/ directory.")
         return
 
+    tcx_files.sort()
     # File selection
     selected_file = st.sidebar.selectbox("Select a TCX file:", [f.name for f in tcx_files])
     tcx_path = data_dir / selected_file
